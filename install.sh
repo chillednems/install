@@ -405,14 +405,18 @@ find_command_line_tools_path() {
 ensure_command_line_tools_selected() {
   local command_line_tools_path selected_path
 
+  selected_path="$(/usr/bin/xcode-select -p 2>/dev/null || true)"
+  if [[ "${selected_path}" == "/Applications/Xcode.app/Contents/Developer" ||
+        "${selected_path}" == "/Library/Developer/CommandLineTools" ]] &&
+     [[ -e "${selected_path}/usr/bin/git" ]]
+  then
+    return
+  fi
+
   command_line_tools_path="$(find_command_line_tools_path)"
   [[ -n "${command_line_tools_path}" ]] || return
 
-  selected_path="$(/usr/bin/xcode-select -p 2>/dev/null || true)"
-  if [[ "${selected_path}" != "${command_line_tools_path}" ]]
-  then
-    execute_sudo "/usr/bin/xcode-select" "--switch" "${command_line_tools_path}"
-  fi
+  execute_sudo "/usr/bin/xcode-select" "--switch" "${command_line_tools_path}"
 }
 
 get_permission() {
