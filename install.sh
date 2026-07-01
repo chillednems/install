@@ -365,17 +365,53 @@ check_run_command_as_root() {
 }
 
 should_install_command_line_tools() {
+  local command_line_tools_path
+
   if [[ -n "${HOMEBREW_ON_LINUX-}" ]]
+  then
+    return 1
+  fi
+
+  command_line_tools_path="$(find_command_line_tools_path)"
+  if [[ "${command_line_tools_path}" == "/Applications/Xcode.app/Contents/Developer" ]]
   then
     return 1
   fi
 
   if version_gt "${macos_version}" "10.13"
   then
-    ! [[ -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]
+    [[ -z "${command_line_tools_path}" ]]
   else
-    ! [[ -e "/Library/Developer/CommandLineTools/usr/bin/git" ]] ||
+    [[ -z "${command_line_tools_path}" ]] ||
       ! [[ -e "/usr/include/iconv.h" ]]
+  fi
+}
+
+find_command_line_tools_path() {
+  local developer_path
+
+  for developer_path in \
+    "/Applications/Xcode.app/Contents/Developer" \
+    "/Library/Developer/CommandLineTools"
+  do
+    if [[ -e "${developer_path}/usr/bin/git" ]]
+    then
+      echo "${developer_path}"
+      return
+    fi
+  done
+}
+
+ensure_command_line_tools_selected() {
+  local command_line_tools_path selected_path
+
+  command_line_tools_path="$(find_command_line_tools_path)"
+  [[ -n "${command_line_tools_path}" ]] || return
+
+  selected_path="$(/usr/bin/xcode-select -p 2>/dev/null || true)"
+  if [[ "${selected_path}" != "${command_line_tools_path}" ]]
+  then
+    execute_sudo "/usr/bin/xcode-select" "--switch" "${command_line_tools_path}"
   fi
 }
 
@@ -840,6 +876,11 @@ fi
 if [[ -d "${HOMEBREW_CACHE}" ]]
 then
   execute "${TOUCH[@]}" "${HOMEBREW_CACHE}/.cleaned"
+fi
+
+if [[ -n "${HOMEBREW_ON_MACOS-}" ]]
+then
+  ensure_command_line_tools_selected
 fi
 
 if should_install_command_line_tools && version_ge "${macos_version}" "10.13"
